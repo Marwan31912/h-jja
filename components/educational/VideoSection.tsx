@@ -160,6 +160,18 @@ export const VideoSection: React.FC<VideoSectionProps> = ({
     };
   }, [editingVideo]);
 
+  // Select video with optional quality
+  const handleSelectVideo = (video: VideoLesson, quality?: string) => {
+    setActiveVideo(video);
+    if (quality) {
+      setActiveQuality(quality);
+      if (video.fileName) {
+        const streamUrl = getVideoStreamUrl(video.fileName, video, quality);
+        setActiveVideoSrc(streamUrl);
+      }
+    }
+  };
+
   // Load video streaming source when active video changes
   useEffect(() => {
     let objectUrl: string | null = null;
@@ -922,7 +934,7 @@ export const VideoSection: React.FC<VideoSectionProps> = ({
               isDragging={draggedIndex === idx}
               isDragOver={dragOverIndex === idx && draggedIndex !== idx}
               isDarkMode={isDarkMode}
-              onSelect={setActiveVideo}
+              onSelect={handleSelectVideo}
               onToggleComplete={handleToggleComplete}
               onEdit={handleOpenEdit}
               onDelete={handleDeleteVideo}

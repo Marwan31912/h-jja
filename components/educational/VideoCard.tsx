@@ -15,7 +15,7 @@ interface VideoCardProps {
   isDragging: boolean;
   isDragOver: boolean;
   isDarkMode?: boolean;
-  onSelect: (video: VideoLesson) => void;
+  onSelect: (video: VideoLesson, quality?: string) => void;
   onToggleComplete: (id: string, e: React.MouseEvent) => void;
   onEdit: (video: VideoLesson, e: React.MouseEvent) => void;
   onDelete: (id: string, e: React.MouseEvent) => void;
@@ -189,10 +189,42 @@ export const VideoCard: React.FC<VideoCardProps> = ({
               {showMenu && (
                 <div 
                   onClick={(e) => e.stopPropagation()}
-                  className={`absolute left-0 mt-2 w-48 rounded-2xl p-1.5 shadow-2xl border z-40 animate-in fade-in ${
+                  className={`absolute left-0 mt-2 w-56 rounded-2xl p-2 shadow-2xl border z-40 animate-in fade-in ${
                     isDarkMode ? 'bg-zinc-800 border-white/10 text-white' : 'bg-white border-gray-100 text-gray-800'
                   }`}
                 >
+                  {/* Quality Select Section in 3-Dots */}
+                  <div className="pb-2 mb-2 border-b border-gray-100 dark:border-white/10">
+                    <div className="text-[10px] font-black text-gray-400 px-2 mb-1.5 flex items-center justify-between">
+                      <span>اختيار جودة التشغيل:</span>
+                      <span className="text-blue-500 font-mono">{availableQualities.length || 1} جودة</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-1">
+                      {['1080p', '720p', '480p', '360p', '320p'].map((q) => {
+                        const isAvail = availableQualities.includes(q) || (q === '1080p' && !availableQualities.length);
+                        return (
+                          <button
+                            key={q}
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setShowMenu(false);
+                              onSelect(video, q);
+                            }}
+                            className={`px-2 py-1 rounded-lg text-[10px] font-black text-center transition-all ${
+                              isAvail
+                                ? isDarkMode ? 'bg-zinc-700/60 hover:bg-blue-600 text-gray-200 hover:text-white' : 'bg-gray-100 hover:bg-blue-600 text-gray-700 hover:text-white'
+                                : isDarkMode ? 'opacity-30 bg-zinc-900/40 text-gray-500 cursor-not-allowed' : 'opacity-30 bg-gray-50 text-gray-400 cursor-not-allowed'
+                            }`}
+                            title={isAvail ? `تشغيل بجودة ${q}` : `جودة ${q} غير متوفرة بعد`}
+                          >
+                            {q}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
                   <button 
                     onClick={(e) => { 
                       e.stopPropagation();
@@ -289,10 +321,19 @@ export const VideoCard: React.FC<VideoCardProps> = ({
             {/* Quality Badges */}
             <div className="flex items-center gap-1">
               {availableQualities.length > 0 ? (
-                availableQualities.slice(0, 3).map((q) => (
-                  <span key={q} className="text-[9px] font-black px-1.5 py-0.5 rounded bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-300">
+                availableQualities.map((q) => (
+                  <button
+                    key={q}
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onSelect(video, q);
+                    }}
+                    className="text-[9px] font-black px-1.5 py-0.5 rounded bg-blue-500/10 hover:bg-blue-600 text-blue-600 dark:text-blue-400 hover:text-white transition-all cursor-pointer"
+                    title={`تشغيل الدرس بجودة ${q}`}
+                  >
                     {q}
-                  </span>
+                  </button>
                 ))
               ) : (
                 <span className="text-[10px] text-gray-400 font-bold">1080p HD</span>
