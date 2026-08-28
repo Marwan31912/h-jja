@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, shrink-to-fit=no">
+    <title>ديناصور جوجل الأصلي - T-Rex Runner</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background-color: #f7f7f7;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+            font-family: 'Courier New', Courier, monospace;
+            touch-action: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+        #game-container {
+            width: 600px;
+            height: 150px;
+            position: relative;
+            overflow: hidden;
+            background-color: #f7f7f7;
+            cursor: pointer;
+        }
+        canvas {
+            display: block;
+            image-rendering: -moz-crisp-edges;
+            image-rendering: -webkit-optimize-contrast;
+            image-rendering: pixelated;
+            image-rendering: optimize-speed;
+        }
+        #ui {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            font-size: 18px;
+            color: #535353;
+            font-weight: bold;
+            pointer-events: none;
+            display: flex;
+            gap: 20px;
+        }
+        #game-over {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            display: none;
+            z-index: 10;
+        }
+        .game-over-img {
+            margin-bottom: 20px;
+        }
+        #restart-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            outline: none;
+            padding: 10px;
+        }
+        /* Night Mode transition */
+        .night-mode {
+            background-color: #202124 !important;
+            filter: invert(100%);
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <canvas id="game" width="600" height="150"></canvas>
+        <div id="ui">
+            <div id="hi-score">HI 00000</div>
+            <div id="score">00000</div>
+        </div>
+        <div id="game-over">
+            <div class="game-over-img">
+                <svg width="384" height="22" viewBox="0 0 191 11" fill="#535353">
+                    <path d="M12.4,5.4h-5.2c0,3,1.9,4.4,4.3,4.4c1.6,0,3.3-0.7,3.9-1.9L16.2,8c-1,1.5-2.7,2.2-4.6,2.2c-3.6,0-6-2.5-6-5.1
+                        c0-2.6,2.3-5.2,5.9-5.2c3.5,0,5.8,2.4,5.8,5c0,0.4-0.1,0.6-0.1,0.6h-4.8L12.4,5.4z M7.7,4h4.7c-0.1-1.6-1.6-2.8-3.4-2.8
+                        C7.3,1.2,7.7,2.5,7.7,4z M21.3,0.3h1.6L19,10.1h-1.6L14,0.3h1.6l3.4,7.8L21.3,0.3z M30.8,0.3v1.3L27.5,7c-0.6,1.2-1.3,1.8-2,1.8
+                        c-0.2,0-0.4,0-0.6,0l-0.3-1.3c0.3,0,0.6,0.1,0.8,0.1c0.5,0,1-0.3,1.3-1L30.8,0.3z M37.9,7.6l-3.2,0.1c0,0.6,0.6,1.1,1.4,1.1
+                        c0.8,0,1.3-0.5,1.3-1V7.6z M37.9,0.3v7.3c0,2.1-1.4,3.1-3.1,3.1c-1.8,0-3-1-3-2.6v-2h1.6v2.1c0,0.7,0.6,1.2,1.4,1.2
+                        c0.8,0,1.4-0.4,1.4-1.2V0.3H37.9z M48.7,4.3c0-2.3-1.6-4.1-3.9-4.1c-2.4,0-4.1,1.9-4.1,5.1s1.7,5.1,4.1,5.1c2.3,0,3.9-1.8,3.9-4.1
+                        V4.3z M42.3,5.3c0-2.5,1.2-3.8,2.5-3.8c1.3,0,2.4,1.3,2.4,3.8c0,2.5-1,3.8-2.4,3.8C43.5,9.1,42.3,7.8,42.3,5.3z M57,0.3L53.2,10.1
+                        h-1.6l-3.8-9.8h1.6L52.4,8l2.9-7.7L57,0.3z M66.9,5.4h-5.2c0,3,1.9,4.4,4.3,4.4c1.6,0,3.3-0.7,3.9-1.9L69.7,8
+                        c-1,1.5-2.7,2.2-4.6,2.2c-3.6,0-6-2.5-6-5.1c0-2.6,2.3-5.2,5.9-5.2c3.5,0,5.8,2.4,5.8,5c0,0.4-0.1,0.6-0.1,0.6h-4.8L66.9,5.4z
+                        M62.2,4h4.7c-0.1-1.6-1.6-2.8-3.4-2.8C61.8,1.2,62.2,2.5,62.2,4z M77.4,1.4h-1.5c-0.9,0-1.4,0.3-1.4,1.3v0.5H77V4.5h-2.5
+                        L74.5,10.1h-1.6L72.9,4.5H71V3.2h1.9c0-1.7,1.1-2.9,2.9-2.9h1.6V1.4z M85,0.3v9.8h-1.6V0.3H85z M92,5.3L89.6,9L87.2,5.3v4.8h-1.6
+                        V0.3h1.6l3.4,5.4L94,0.3h1.6v9.8H94V5.3z"/>
+                </svg>
+            </div>
+            <button id="restart-btn">
+                <svg width="36" height="32" viewBox="0 0 36 32" fill="#535353">
+                    <path d="M18 20.3c-2.8 0-5.1-2.3-5.1-5.1s2.3-5.1 5.1-5.1c1.4 0 2.7.6 3.6 1.5l-2.4 2.4h6.8V7.3l-2.5 2.5C22.2 8.4 20.2 7.3 18 7.3c-4.7 0-8.5 3.8-8.5 8.5s3.8 8.5 8.5 8.5c4 0 7.4-2.8 8.1-6.5h-1.7c-.6 2.8-3.1 4.8-5.9 4.8z"/>
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * Chrome Dino Game - High Fidelity Clone
+         * Sprites drawn via pixel manipulation to ensure absolute originality without external assets.
+         */
+        console.log("Dino Game: Initializing...");
+
+        const canvas = document.getElementById('game');
+        const ctx = canvas.getContext('2d');
+        const scoreEl = document.getElementById('score');
+        const hiScoreEl = document.getElementById('hi-score');
+        const gameOverEl = document.getElementById('game-over');
+        const containerEl = document.getElementById('game-container');
+
+        if (!canvas || !ctx) {
+            console.error("Dino Game: Canvas or Context not found!");
+        } else {
+            console.log("Dino Game: Canvas and Context ready.");
+        }
+
+        const CONFIG = {
+            GRAVITY: 0.6,
+            JUMP_FORCE: -10,
+            GROUND_Y: 127,
+            INITIAL_SPEED: 6,
+            MAX_SPEED: 13,
+            ACCEL: 0.001,
+            FPS: 60,
+            WIDTH: 600,
+            HEIGHT: 150
+        };
+
+        const PIXELS = {
+            // High Fidelity Classic Dino (44x47)
+            DINO_STILL: [
+                [22, 0, 22, 16], // Upper head
+                [22, 16, 16, 10], // Jaw/Shoulder
+                [38, 8, 6, 8], // Snout
+                [0, 16, 26, 16], // Body & Tail
+                [10, 32, 16, 6], // Belly
+                [24, 24, 8, 4], // Arm
+                [24, 42, 6, 5], // Left Foot
+                [36, 42, 6, 5], // Right Foot
+                [28, 4, 4, 4, 2] // Eye (color swap)
+            ],
+            DINO_RUN1: [
+                [22, 0, 22, 16], [22, 16, 16, 10], [38, 8, 6, 8],
+                [0, 16, 26, 16], [10, 32, 16, 6], [24, 24, 8, 4],
+                [24, 42, 6, 5], // Foot down
+                [28, 4, 4, 4, 2]
+            ],
+            DINO_RUN2: [
+                [22, 0, 22, 16], [22, 16, 16, 10], [38, 8, 6, 8],
+                [0, 16, 26, 16], [10, 32, 16, 6], [24, 24, 8, 4],
+                [36, 42, 6, 5], // Other foot down
+                [28, 4, 4, 4, 2]
+            ],
+            DINO_DEAD: [
+                [22, 0, 22, 16], [22, 16, 16, 10], [38, 8, 6, 8],
+                [0, 16, 26, 16], [10, 32, 16, 6], [24, 24, 8, 4],
+                [24, 42, 4, 4], [36, 42, 4, 4], 
+                [28, 4, 2, 2, 2], [34, 4, 2, 2, 2] // Dead eyes
+            ],
+            DINO_DUCK1: [[0,10,59,20],[40,0,15,12],[48,4,3,3,2]],
+            DINO_DUCK2: [[0,10,59,20],[40,0,15,12],[48,4,3,3,2],[10,30,10,3]],
+            // Environment
+            CACT_S: [[7,0,6,25],[0,10,4,10],[17,8,3,8],[0,20,10,2],[15,15,5,2]],
+            CACT_L: [[10,0,5,50],[0,15,5,15],[0,30,15,5],[20,10,5,15],[10,25,15,5]],
+            CLOUD: [[16,0,24,6],[8,4,32,6],[0,8,46,6]],
+            BIRD1: [[15,0,27,10],[0,10,42,10],[10,20,15,10]],
+            BIRD2: [[15,15,27,10],[0,25,42,10],[10,35,15,10]]
+        };
+
+        function drawPixels(data, x, y, color = '#222222') {
+            data.forEach(p => {
+                if (p[4] === 2) ctx.fillStyle = '#f7f7f7';
+                else ctx.fillStyle = color;
+                ctx.fillRect(x + p[0], y + p[1], p[2], p[3]);
+            });
+        }
+
+        class Dino {
+            constructor() {
+                this.reset();
+            }
+            reset() {
+                this.x = 20;
+                this.y = CONFIG.GROUND_Y - 47;
+                this.w = 44;
+                this.h = 47;
+                this.dy = 0;
+                this.isJumping = false;
+                this.isDucking = false;
+                this.frame = 0;
+                this.nextFrameTime = 0;
+                this.status = 'walking';
+            }
+            jump() {
+                if (!this.isJumping && !this.isDucking) {
+                    this.dy = CONFIG.JUMP_FORCE;
+                    this.isJumping = true;
+                    this.status = 'jumping';
+                }
+            }
+            duck(state) {
+                if (!this.isJumping) {
+                    this.isDucking = state;
+                    this.h = state ? 30 : 47;
+                    this.y = state ? CONFIG.GROUND_Y - 30 : CONFIG.GROUND_Y - 47;
+                }
+            }
+            update(time, speed) {
+                if (this.isJumping) {
+                    this.dy += CONFIG.GRAVITY;
+                    this.y += this.dy;
+                    if (this.y > CONFIG.GROUND_Y - 47) {
+                        this.y = CONFIG.GROUND_Y - 47;
+                        this.dy = 0;
+                        this.isJumping = false;
+                    }
+                }
+                if (!this.isJumping && !game.over && game.started) {
+                    if (time > this.nextFrameTime) {
+                        this.frame = this.frame === 0 ? 1 : 0;
+                        this.nextFrameTime = time + (100 / (speed / 6));
+                    }
+                }
+            }
+            draw() {
+                let p;
+                if (this.isJumping) p = PIXELS.DINO_STILL;
+                else if (this.isDucking) p = this.frame === 0 ? PIXELS.DINO_DUCK1 : PIXELS.DINO_DUCK2;
+                else p = this.frame === 0 ? PIXELS.DINO_RUN1 : PIXELS.DINO_RUN2;
+                if (game.over) p = PIXELS.DINO_DEAD;
+                drawPixels(p, this.x, this.y);
+            }
+            getRect() {
+                return { x: this.x + 5, y: this.y + 5, w: (this.isDucking ? 59 : 44) - 10, h: this.h - 10 };
+            }
+        }
+
+        class Obstacle {
+            constructor(x, speed, score) {
+                this.x = x;
+                this.type = 'S';
+                // Birds appear after 400 points
+                if (score > 400 && Math.random() > 0.6) {
+                    this.type = 'B';
+                    this.w = 42;
+                    this.h = 30;
+                    // Improved levels: 40 (high - stay down), 75 (mid - duck), 100 (low - jump)
+                    const levels = [40, 75, 100];
+                    this.y = levels[Math.floor(Math.random() * levels.length)];
+                    this.frame = 0;
+                    this.nextFrameTime = 0;
+                } else {
+                    this.type = Math.random() > 0.6 ? 'L' : 'S';
+                    this.w = this.type === 'L' ? 25 : 20;
+                    this.h = this.type === 'L' ? 50 : 35;
+                    this.y = CONFIG.GROUND_Y - this.h;
+                }
+            }
+            update(speed, now) {
+                this.x -= speed;
+                if (this.type === 'B') {
+                    if (now > this.nextFrameTime) {
+                        this.frame = this.frame === 0 ? 1 : 0;
+                        this.nextFrameTime = now + 200;
+                    }
+                }
+            }
+            draw() {
+                if (this.type === 'B') {
+                    drawPixels(this.frame === 0 ? PIXELS.BIRD1 : PIXELS.BIRD2, this.x, this.y);
+                } else {
+                    drawPixels(this.type === 'L' ? PIXELS.CACT_L : PIXELS.CACT_S, this.x, this.y);
+                }
+            }
+            getRect() {
+                return { x: this.x + 5, y: this.y + 5, w: this.w - 10, h: this.h - 10 };
+            }
+        }
+
+        class Cloud {
+            constructor(x) {
+                this.x = x;
+                this.y = 20 + Math.random() * 50;
+                this.speed = 0.5 + Math.random() * 0.5;
+            }
+            update() { this.x -= this.speed; }
+            draw() { drawPixels(PIXELS.CLOUD, this.x, this.y, '#e5e5e5'); }
+        }
+
+        const game = {
+            started: false,
+            over: false,
+            score: 0,
+            hi: parseInt(localStorage.getItem('dino-hi-score')) || 0,
+            speed: CONFIG.INITIAL_SPEED,
+            time: 0,
+            lastTime: 0,
+            dino: new Dino(),
+            obstacles: [],
+            clouds: [],
+            groundX: 0,
+            night: false
+        };
+
+        // Initial update of HI score display
+        hiScoreEl.innerText = 'HI ' + game.hi.toString().padStart(5, '0');
+
+        function reset() {
+            game.over = false;
+            game.started = true;
+            game.score = 0;
+            game.speed = CONFIG.INITIAL_SPEED;
+            game.obstacles = [];
+            game.clouds = [];
+            game.dino.reset();
+            game.time = 0;
+            game.night = false;
+            document.body.classList.remove('night-mode');
+            gameOverEl.style.display = 'none';
+        }
+
+        function checkCollision(r1, r2) {
+            return r1.x < r2.x + r2.w && r1.x + r1.w > r2.x && r1.y < r2.y + r2.h && r1.y + r1.h > r2.y;
+        }
+
+        function spawn() {
+            // حساب المسافة الدنيا بناءً على السرعة لضمان وجود وقت كافٍ للرد
+            // تزداد المسافة الدنيا مع السرعة لضمان التزامن ومنع العشوائية المفرطة
+            const minGap = 250 + (game.speed * 25); 
+            const randomGap = Math.random() * (game.speed * 15); 
+            
+            if (game.obstacles.length === 0 || (CONFIG.WIDTH - game.obstacles[game.obstacles.length-1].x > minGap + randomGap)) {
+                game.obstacles.push(new Obstacle(CONFIG.WIDTH + 50, game.speed, game.score));
+            }
+            if (game.clouds.length < 3 && Math.random() < 0.01) {
+                game.clouds.push(new Cloud(CONFIG.WIDTH + 100));
+            }
+        }
+
+        function gameLoop(now) {
+            if (game.lastTime === 0) game.lastTime = now;
+            const delta = now - game.lastTime;
+            game.lastTime = now;
+
+            update(now);
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        function update(now) {
+            if (!game.started || game.over) return;
+
+            game.time++;
+            const newScore = Math.floor(game.time / 10);
+            
+            // Speed logic
+            if (newScore < 300) {
+                game.speed = Math.min(CONFIG.MAX_SPEED, game.speed + CONFIG.ACCEL);
+                // زيادة السرعة عند كل 100 نقطة
+                if (newScore > game.score && Math.floor(newScore / 100) > Math.floor(game.score / 100)) {
+                    game.speed = Math.min(CONFIG.MAX_SPEED, game.speed + 0.5);
+                }
+            } else if (newScore > game.score && Math.floor(newScore / 100) > Math.floor(game.score / 100)) {
+                // تزيد السرعة بنسبة 10% عند كل 100 نقطة بعد الـ 300
+                game.speed = game.speed * 1.1;
+            }
+            
+            game.score = newScore;
+
+            // Theme integration (Sync with app theme only)
+            let isAppDark = false;
+            try {
+                isAppDark = window.parent.document.documentElement.classList.contains('dark');
+            } catch (e) {}
+
+            if (isAppDark) {
+                document.body.classList.add('night-mode');
+            } else {
+                document.body.classList.remove('night-mode');
+            }
+
+            game.dino.update(now, game.speed);
+            
+            game.groundX -= game.speed;
+            if (game.groundX <= -CONFIG.WIDTH) game.groundX = 0;
+
+            game.clouds.forEach(c => c.update());
+            game.clouds = game.clouds.filter(c => c.x > -100);
+
+            spawn();
+
+            const dinoRect = game.dino.getRect();
+            game.obstacles.forEach(ob => {
+                ob.update(game.speed, now);
+                if (checkCollision(dinoRect, ob.getRect())) {
+                    game.over = true;
+                    if (game.score > game.hi) {
+                        game.hi = game.score;
+                        localStorage.setItem('dino-hi-score', game.hi);
+                    }
+                    gameOverEl.style.display = 'block';
+                }
+            });
+            game.obstacles = game.obstacles.filter(ob => ob.x > -100);
+
+            scoreEl.innerText = game.score.toString().padStart(5, '0');
+            hiScoreEl.innerText = 'HI ' + game.hi.toString().padStart(5, '0');
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, CONFIG.WIDTH, CONFIG.HEIGHT);
+
+            // Clouds
+            game.clouds.forEach(c => c.draw());
+
+            // Ground
+            ctx.fillStyle = '#535353';
+            ctx.fillRect(0, CONFIG.GROUND_Y, CONFIG.WIDTH, 1);
+            // Pebbles
+            for(let i=0; i<15; i++) {
+                let px = (game.groundX + (i*100)) % CONFIG.WIDTH;
+                if (px < 0) px += CONFIG.WIDTH;
+                ctx.fillRect(px, CONFIG.GROUND_Y + 5, 2, 1);
+                ctx.fillRect(px + 40, CONFIG.GROUND_Y + 10, 3, 1);
+            }
+
+            game.obstacles.forEach(ob => ob.draw());
+            game.dino.draw();
+        }
+
+        // Listeners
+        function handleAction(e) {
+            if (e) e.preventDefault();
+            if (!game.started || game.over) {
+                console.log("Dino Game: Starting/Resetting...");
+                reset();
+            } else {
+                game.dino.jump();
+            }
+        }
+
+        window.addEventListener('keydown', e => {
+            if (e.code === 'Space' || e.code === 'ArrowUp' || e.key === ' ' || e.key === 'ArrowUp') {
+                handleAction(e);
+            }
+            if (e.code === 'ArrowDown' || e.key === 'ArrowDown') {
+                if (e) e.preventDefault();
+                game.dino.duck(true);
+            }
+        });
+        window.addEventListener('keyup', e => {
+            if (e.code === 'ArrowDown' || e.key === 'ArrowDown') {
+                game.dino.duck(false);
+            }
+        });
+        
+        containerEl.addEventListener('touchstart', handleAction);
+        containerEl.addEventListener('mousedown', handleAction);
+
+        document.getElementById('restart-btn').onclick = (e) => {
+            e.stopPropagation();
+            reset();
+        };
+
+        console.log("Dino Game: Loop starting...");
+        requestAnimationFrame(gameLoop);
+    </script>
+</body>
+</html>
+
+

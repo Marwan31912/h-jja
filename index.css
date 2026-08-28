@@ -1,0 +1,141 @@
+@font-face {
+  font-family: 'Cairo';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: local('Cairo'), url('/fonts/cairo-400.ttf') format('truetype');
+}
+@font-face {
+  font-family: 'Cairo';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: local('Cairo Medium'), local('Cairo-Medium'), url('/fonts/cairo-500.ttf') format('truetype');
+}
+@font-face {
+  font-family: 'Cairo';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: local('Cairo SemiBold'), local('Cairo-SemiBold'), url('/fonts/cairo-600.ttf') format('truetype');
+}
+@font-face {
+  font-family: 'Cairo';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: local('Cairo Bold'), local('Cairo-Bold'), url('/fonts/cairo-700.ttf') format('truetype');
+}
+@font-face {
+  font-family: 'Cairo';
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: local('Cairo ExtraBold'), local('Cairo-ExtraBold'), url('/fonts/cairo-800.ttf') format('truetype');
+}
+@font-face {
+  font-family: 'Cairo';
+  font-style: normal;
+  font-weight: 900;
+  font-display: swap;
+  src: local('Cairo Black'), local('Cairo-Black'), url('/fonts/cairo-900.ttf') format('truetype');
+}
+
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Cairo", "Almarai", "Tajawal", "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+}
+
+@layer base {
+  body {
+    font-family: "Cairo", "Almarai", "Tajawal", "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    font-display: swap;
+    background-color: #f3f4f6;
+    margin: 0;
+    padding: 0;
+    height: 100vh;
+    width: 100vw;
+    overflow: hidden;
+  }
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 10px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+@keyframes googleGradientShift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.google-border-button {
+  position: relative;
+  border: 2px solid #e2e8f0 !important;
+  transition: all 0.25s ease;
+}
+
+.dark .google-border-button {
+  border-color: #27272a !important;
+}
+
+.google-border-button:hover {
+  border: 2px solid transparent !important;
+  background-image: linear-gradient(#ffffff, #ffffff), linear-gradient(120deg, #4285F4, #EA4335, #FBBC05, #34A853, #4285F4, #EA4335);
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+  background-size: 100% 100%, 300% 300%;
+  animation: googleGradientShift 3.5s ease infinite;
+  box-shadow: 0 4px 12px -2px rgba(66, 133, 244, 0.25), 0 2px 6px -1px rgba(234, 67, 53, 0.2);
+  transform: translateY(-1px);
+}
+
+.dark .google-border-button:hover {
+  background-image: linear-gradient(#18181b, #18181b), linear-gradient(120deg, #4285F4, #EA4335, #FBBC05, #34A853, #4285F4, #EA4335);
+}
+
+/* GPU Hardware Acceleration for smooth transitions and zero frame drops */
+.gpu-accelerated {
+  will-change: transform, opacity;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+/* Skeleton Shimmer animation */
+@keyframes shimmerWave {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.4) 50%, rgba(255,255,255,0) 100%);
+  background-size: 200% 100%;
+  animation: shimmerWave 1.8s infinite ease-in-out;
+}
+
+.dark .skeleton-shimmer {
+  background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0) 100%);
+  background-size: 200% 100%;
+}
+

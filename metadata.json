@@ -1,0 +1,8 @@
+{
+  "name": "حجة",
+  "description": "منصة حجة التعليمية والأكاديمية المتكاملة لإدارة المحتوى التعليمي، الفيديوهات، ملفات PDF، الواجبات، والاختبارات بهيكلية شجرية ذكية.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

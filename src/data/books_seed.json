@@ -1,0 +1,41 @@
+[
+  {
+    "id": "seed-book-1",
+    "title": "مقدمة ابن خلدون",
+    "author": "ابن خلدون",
+    "category": "تاريخ",
+    "subCategory": "فلسفة التاريخ",
+    "quantity": 10,
+    "price": 50,
+    "purchasePrice": 35,
+    "addedAt": 1709745420000,
+    "barcode": "9780000000001",
+    "location": "رف أ-1"
+  },
+  {
+    "id": "seed-book-2",
+    "title": "الرحيق المختوم",
+    "author": "صفي الرحمن المباركفوري",
+    "category": "سيرة نبوية",
+    "subCategory": "تاريخ إسلامي",
+    "quantity": 15,
+    "price": 40,
+    "purchasePrice": 28,
+    "addedAt": 1709745420000,
+    "barcode": "9780000000002",
+    "location": "رف ب-3"
+  },
+  {
+    "id": "seed-book-3",
+    "title": "كليلة ودمنة",
+    "author": "عبد الله بن المقفع",
+    "category": "أدب",
+    "subCategory": "قصص وحكايات",
+    "quantity": 8,
+    "price": 30,
+    "purchasePrice": 20,
+    "addedAt": 1709745420000,
+    "barcode": "9780000000003",
+    "location": "رف ج-5"
+  }
+]
