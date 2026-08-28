@@ -3,10 +3,11 @@ import React, { useState, useEffect } from 'react';
 import { 
   User, ShieldCheck, RefreshCw, Sparkles, CheckCircle2, 
   DownloadCloud, Zap, Laptop, ArrowUpCircle, HardDrive, Check,
-  AlertCircle, FileArchive, UploadCloud
+  AlertCircle, FileArchive, UploadCloud, GitBranch
 } from 'lucide-react';
 import { Page, UserAccount } from '../types';
 import { SmartZipUpdater } from './SmartZipUpdater';
+import { GitHubUpdater } from './GitHubUpdater';
 
 interface SettingsProps {
   onClearData: () => void;
@@ -26,7 +27,7 @@ const Settings: React.FC<SettingsProps> = ({
   isDarkMode
 }) => {
   const [currentVersion, setCurrentVersion] = useState('1.0.0');
-  const [activeUpdaterTab, setActiveUpdaterTab] = useState<'zip' | 'cloud'>('zip');
+  const [activeUpdaterTab, setActiveUpdaterTab] = useState<'github' | 'zip' | 'cloud'>('github');
   const [isChecking, setIsChecking] = useState(false);
   const [updateStatus, setUpdateStatus] = useState<'idle' | 'up-to-date' | 'downloading' | 'ready'>('idle');
   const [downloadProgress, setDownloadProgress] = useState(0);
@@ -87,7 +88,7 @@ const Settings: React.FC<SettingsProps> = ({
         </button>
       </section>
 
-      {/* 2. مركز التحديث الشامل: رفع ملف ZIP والفحص التلقائي للملفات المعدلة */}
+      {/* 2. مركز التحديث الشامل: GitHub، رفع ملف ZIP والفحص التلقائي */}
       <section className={`p-6 sm:p-8 rounded-[36px] border-2 shadow-sm space-y-6 transition-all ${
         isDarkMode ? 'bg-zinc-800 border-white/5' : 'bg-white border-blue-100/70'
       }`}>
@@ -95,7 +96,7 @@ const Settings: React.FC<SettingsProps> = ({
         {/* رأس القسم الرئيسي */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center shadow-lg shadow-blue-500/20">
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-emerald-600 via-teal-600 to-blue-600 text-white flex items-center justify-center shadow-lg shadow-emerald-500/20">
               <Zap size={28} />
             </div>
             <div>
@@ -103,50 +104,70 @@ const Settings: React.FC<SettingsProps> = ({
                 <h3 className={`font-black text-lg ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
                   نظام التحديث الذكي والفوري للمنصة
                 </h3>
-                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-black bg-blue-500/10 text-blue-500 border border-blue-500/20 font-mono">
+                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-black bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 font-mono">
                   v{currentVersion}
                 </span>
               </div>
               <p className="text-xs text-gray-500 font-bold mt-1">
-                تحديث ملفات المنصة مباشرة عبر ملف ZIP أو الفحص السحابي، مع مراجعة كاملة للملفات قبل التحديث وحماية قواعد البيانات.
+                تحديث ملفات المنصة مباشرة عبر GitHub أو ملف ZIP، مع مراجعة كاملة وحماية شاملة لقواعد البيانات.
               </p>
             </div>
           </div>
 
           {/* تبديل طريقة التحديث */}
-          <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-gray-100 dark:bg-zinc-900 self-start sm:self-auto border border-gray-200 dark:border-white/5">
+          <div className="flex flex-wrap items-center gap-1.5 p-1.5 rounded-2xl bg-gray-100 dark:bg-zinc-900 self-start sm:self-auto border border-gray-200 dark:border-white/5">
+            <button
+              onClick={() => setActiveUpdaterTab('github')}
+              className={`px-3.5 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all ${
+                activeUpdaterTab === 'github'
+                  ? 'bg-emerald-600 text-white shadow-md'
+                  : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
+              }`}
+            >
+              <GitBranch size={15} />
+              <span>مستودع GitHub (مباشر)</span>
+            </button>
             <button
               onClick={() => setActiveUpdaterTab('zip')}
-              className={`px-4 py-2 rounded-xl text-xs font-black flex items-center gap-2 transition-all ${
+              className={`px-3.5 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all ${
                 activeUpdaterTab === 'zip'
                   ? 'bg-blue-600 text-white shadow-md'
                   : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
               }`}
             >
               <FileArchive size={15} />
-              <span>رفع ملف ZIP المحدث</span>
+              <span>رفع ملف ZIP</span>
             </button>
             <button
               onClick={() => setActiveUpdaterTab('cloud')}
-              className={`px-4 py-2 rounded-xl text-xs font-black flex items-center gap-2 transition-all ${
+              className={`px-3.5 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all ${
                 activeUpdaterTab === 'cloud'
                   ? 'bg-blue-600 text-white shadow-md'
                   : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
               }`}
             >
               <RefreshCw size={14} />
-              <span>فحص سحابي سريع</span>
+              <span>فحص سحابي</span>
             </button>
           </div>
         </div>
 
+        {/* محتوى تبويب GitHub */}
+        {activeUpdaterTab === 'github' && (
+          <div className="pt-2 animate-in fade-in duration-300">
+            <GitHubUpdater isDarkMode={!!isDarkMode} />
+          </div>
+        )}
+
         {/* محتوى تبويب رفع ملف ZIP */}
-        {activeUpdaterTab === 'zip' ? (
+        {activeUpdaterTab === 'zip' && (
           <div className="pt-2 animate-in fade-in duration-300">
             <SmartZipUpdater isDarkMode={!!isDarkMode} />
           </div>
-        ) : (
-          /* محتوى تبويب الفحص السحابي السريع */
+        )}
+
+        {/* محتوى تبويب الفحص السحابي السريع */}
+        {activeUpdaterTab === 'cloud' && (
           <div className="space-y-5 pt-2 animate-in fade-in duration-300">
             <div className="flex items-center justify-between p-4 rounded-2xl bg-gray-50 dark:bg-zinc-900/50 border border-gray-100 dark:border-white/5">
               <div>

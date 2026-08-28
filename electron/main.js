@@ -422,6 +422,156 @@ if (!gotTheLock) {
       }
     });
 
+    ipcMain.handle('system:git-info', async (event, repoUrlParam) => {
+      try {
+        const defaultRepo = 'https://github.com/Marwan31912/h-jja';
+        const targetRepo = repoUrlParam || defaultRepo;
+        let repoOwner = 'Marwan31912';
+        let repoName = 'h-jja';
+        const match = targetRepo.match(/github\.com\/([^\/]+)\/([^\/\.]+)/);
+        if (match) {
+          repoOwner = match[1];
+          repoName = match[2];
+        }
+
+        const https = require('https');
+        const apiUrl = `https://api.github.com/repos/${repoOwner}/${repoName}/commits/main`;
+        return new Promise((resolve) => {
+          https.get(apiUrl, { headers: { 'User-Agent': 'Hojja-Electron-App', 'Accept': 'application/vnd.github.v3+json' } }, (res) => {
+            let data = '';
+            res.on('data', c => data += c);
+            res.on('end', () => {
+              try {
+                if (res.statusCode >= 200 && res.statusCode < 300) {
+                  const json = JSON.parse(data);
+                  resolve({
+                    success: true,
+                    repoUrl: `https://github.com/${repoOwner}/${repoName}`,
+                    branch: 'main',
+                    commitSha: json.sha,
+                    shortSha: json.sha ? json.sha.substring(0, 7) : '',
+                    message: json.commit?.message || '',
+                    author: json.commit?.author?.name || json.author?.login || '',
+                    date: json.commit?.author?.date || '',
+                    htmlUrl: json.html_url || ''
+                  });
+                } else {
+                  resolve({ success: false, error: `GitHub API error: ${res.statusCode}` });
+                }
+              } catch (e) {
+                resolve({ success: false, error: e.message });
+              }
+            });
+          }).on('error', (err) => resolve({ success: false, error: err.message }));
+        });
+      } catch (err) {
+        return { success: false, error: err.message };
+      }
+    });
+
+    ipcMain.handle('system:git-update', async (event, params = {}) => {
+      try {
+        const repoUrl = params.repoUrl || 'https://github.com/Marwan31912/h-jja';
+        const branch = params.branch || 'main';
+
+        let repoOwner = 'Marwan31912';
+        let repoName = 'h-jja';
+        const match = repoUrl.match(/github\.com\/([^\/]+)\/([^\/\.]+)/);
+        if (match) {
+          repoOwner = match[1];
+          repoName = match[2];
+        }
+
+        const isPackaged = app.isPackaged;
+        const projectRoot = isPackaged
+          ? path.join(app.getPath('userData'), 'hot_patch_root')
+          : path.resolve(__dirname, '..');
+
+        const { execSync } = require('child_process');
+        if (fs.existsSync(path.join(projectRoot, '.git'))) {
+          try {
+            execSync(`git pull origin ${branch} --no-rebase`, { cwd: projectRoot, timeout: 60000, encoding: 'utf8' });
+            return {
+              success: true,
+              method: 'git-cli',
+              message: 'تم سحب وتطبيق التحديث بنجاح عبر Git!'
+            };
+          } catch (e) {
+            console.warn('[Electron Git Updater] Git command failed, switching to archive download:', e.message);
+          }
+        }
+
+        const https = require('https');
+        const JSZip = require('jszip');
+        const zipUrl = `https://codeload.github.com/${repoOwner}/${repoName}/zip/refs/heads/${branch}`;
+
+        function fetchZipBuffer(url) {
+          return new Promise((resolve, reject) => {
+            https.get(url, { headers: { 'User-Agent': 'Hojja-Electron-App' } }, (resZip) => {
+              if (resZip.statusCode === 301 || resZip.statusCode === 302) {
+                return resolve(fetchZipBuffer(resZip.headers.location));
+              }
+              if (resZip.statusCode !== 200) {
+                return reject(new Error(`GitHub HTTP Status ${resZip.statusCode}`));
+              }
+              const chunks = [];
+              resZip.on('data', c => chunks.push(c));
+              resZip.on('end', () => resolve(Buffer.concat(chunks)));
+            }).on('error', reject);
+          });
+        }
+
+        const zipBuffer = await fetchZipBuffer(zipUrl);
+        const zip = new JSZip();
+        const loadedZip = await zip.loadAsync(zipBuffer);
+
+        const protectedPatterns = [
+          'server_videos',
+          'server_pdfs',
+          'server_covers',
+          'hojja_catalog.json',
+          'hojja.sqlite',
+          'node_modules',
+          '.git',
+          'metadata.json'
+        ];
+
+        let updatedCount = 0;
+        const updatedFiles = [];
+
+        for (const [rawPath, zipEntry] of Object.entries(loadedZip.files)) {
+          if (zipEntry.dir) continue;
+          const parts = rawPath.replace(/^[\\\/]+/, '').split('/');
+          if (parts.length > 1) parts.shift();
+          const relPath = parts.join('/');
+          if (!relPath) continue;
+
+          const isProtected = protectedPatterns.some(p => relPath.startsWith(p) || relPath.includes('/' + p) || relPath === p);
+          if (isProtected) continue;
+
+          const targetFullPath = path.join(projectRoot, relPath);
+          const dir = path.dirname(targetFullPath);
+          if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+
+          const fileContent = await zipEntry.async('nodebuffer');
+          fs.writeFileSync(targetFullPath, fileContent);
+          updatedCount++;
+          if (updatedFiles.length < 50) updatedFiles.push(relPath);
+        }
+
+        return {
+          success: true,
+          method: 'direct-archive',
+          updatedCount,
+          updatedFilesSample: updatedFiles,
+          message: `تم تحديث المنصة بنجاح على ${updatedCount} ملف من GitHub.`
+        };
+      } catch (e) {
+        console.error('[Electron Git Updater Error]:', e);
+        return { success: false, error: e.message };
+      }
+    });
+
     ipcMain.handle('system:restart-app', async () => {
       try {
         if (mainWindow) {

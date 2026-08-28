@@ -1803,6 +1803,231 @@ async function handleMobileRequest(req, res, options = {}) {
     return true;
   }
 
+  // 12. GitHub Repository Information & Latest Commits
+  if (pathname === '/api/system/git-info' || pathname === '/api/educational/system/git-info') {
+    const defaultRepo = 'https://github.com/Marwan31912/h-jja';
+    const repoParam = parsedUrl.searchParams.get('repo') || defaultRepo;
+    const branchParam = parsedUrl.searchParams.get('branch') || 'main';
+
+    let repoOwner = 'Marwan31912';
+    let repoName = 'h-jja';
+    const match = repoParam.match(/github\.com\/([^\/]+)\/([^\/\.]+)/);
+    if (match) {
+      repoOwner = match[1];
+      repoName = match[2];
+    }
+
+    const https = require('https');
+    const apiUrl = `https://api.github.com/repos/${repoOwner}/${repoName}/commits/${branchParam}`;
+
+    const reqOptions = {
+      headers: {
+        'User-Agent': 'Hojja-Platform-Updater',
+        'Accept': 'application/vnd.github.v3+json'
+      }
+    };
+
+    const fetchGitPromise = new Promise((resolve) => {
+      https.get(apiUrl, reqOptions, (apiRes) => {
+        let data = '';
+        apiRes.on('data', chunk => { data += chunk; });
+        apiRes.on('end', () => {
+          try {
+            if (apiRes.statusCode >= 200 && apiRes.statusCode < 300) {
+              const json = JSON.parse(data);
+              resolve({
+                success: true,
+                repoUrl: `https://github.com/${repoOwner}/${repoName}`,
+                branch: branchParam,
+                commitSha: json.sha,
+                shortSha: json.sha ? json.sha.substring(0, 7) : '',
+                message: json.commit?.message || '',
+                author: json.commit?.author?.name || json.author?.login || '',
+                date: json.commit?.author?.date || '',
+                htmlUrl: json.html_url || ''
+              });
+            } else {
+              // Try fallback to master branch
+              resolve({
+                success: false,
+                repoUrl: `https://github.com/${repoOwner}/${repoName}`,
+                branch: branchParam,
+                error: `HTTP ${apiRes.statusCode}: ${data}`
+              });
+            }
+          } catch (e) {
+            resolve({ success: false, error: e.message });
+          }
+        });
+      }).on('error', (err) => {
+        resolve({ success: false, error: err.message });
+      });
+    });
+
+    fetchGitPromise.then(result => {
+      sendJson(res, result);
+    });
+    return true;
+  }
+
+  // 13. GitHub Direct Pull / Stream Update Endpoint
+  if (pathname === '/api/system/git-pull' || pathname === '/api/educational/system/git-pull') {
+    if (req.method !== 'POST') {
+      sendJson(res, { error: 'Method not allowed' }, 405);
+      return true;
+    }
+
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', async () => {
+      try {
+        const payload = JSON.parse(body || '{}');
+        const repoUrl = (payload.repoUrl || 'https://github.com/Marwan31912/h-jja').trim();
+        const branch = (payload.branch || 'main').trim();
+
+        let repoOwner = 'Marwan31912';
+        let repoName = 'h-jja';
+        const match = repoUrl.match(/github\.com\/([^\/]+)\/([^\/\.]+)/);
+        if (match) {
+          repoOwner = match[1];
+          repoName = match[2];
+        }
+
+        const projectRoot = process.cwd();
+        const { execSync } = require('child_process');
+
+        // Check if local .git directory exists for standard git pull
+        let gitSuccess = false;
+        let gitMessage = '';
+
+        if (fs.existsSync(path.join(projectRoot, '.git'))) {
+          try {
+            console.log('[Git Updater] Attempting native git pull...');
+            try {
+              execSync(`git remote set-url origin https://github.com/${repoOwner}/${repoName}.git`, { cwd: projectRoot, timeout: 15000 });
+            } catch (e) {}
+            
+            const gitOutput = execSync(`git pull origin ${branch} --no-rebase`, { cwd: projectRoot, timeout: 60000, encoding: 'utf8' });
+            console.log('[Git Updater] Native git output:', gitOutput);
+            gitSuccess = true;
+            gitMessage = gitOutput;
+          } catch (gitErr) {
+            console.warn('[Git Updater] Native git command failed or not configured, switching to direct ZIP stream:', gitErr.message);
+          }
+        }
+
+        if (gitSuccess) {
+          sendJson(res, {
+            success: true,
+            method: 'git-cli',
+            message: 'تم سحب وتطبيق التحديث بنجاح عبر Git Pull!',
+            output: gitMessage
+          });
+          return;
+        }
+
+        // Method 2: Direct GitHub Archive Stream & Extraction using JSZip
+        console.log(`[Git Updater] Downloading repository archive from GitHub (${repoOwner}/${repoName} branch: ${branch})...`);
+        const JSZip = require('jszip');
+        const https = require('https');
+
+        const zipUrl = `https://codeload.github.com/${repoOwner}/${repoName}/zip/refs/heads/${branch}`;
+        
+        function fetchZipBuffer(url) {
+          return new Promise((resolve, reject) => {
+            https.get(url, { headers: { 'User-Agent': 'Hojja-Platform-Updater' } }, (resZip) => {
+              if (resZip.statusCode === 301 || resZip.statusCode === 302) {
+                return resolve(fetchZipBuffer(resZip.headers.location));
+              }
+              if (resZip.statusCode !== 200) {
+                return reject(new Error(`فشل تحميل الأرشيف من GitHub (رمز الخطأ: ${resZip.statusCode})`));
+              }
+              const chunks = [];
+              resZip.on('data', c => chunks.push(c));
+              resZip.on('end', () => resolve(Buffer.concat(chunks)));
+            }).on('error', reject);
+          });
+        }
+
+        let zipBuffer;
+        try {
+          zipBuffer = await fetchZipBuffer(zipUrl);
+        } catch (downloadErr) {
+          // If 'main' failed, try 'master' as fallback
+          if (branch === 'main') {
+            console.log('[Git Updater] Fallback: trying branch master...');
+            const fallbackUrl = `https://codeload.github.com/${repoOwner}/${repoName}/zip/refs/heads/master`;
+            zipBuffer = await fetchZipBuffer(fallbackUrl);
+          } else {
+            throw downloadErr;
+          }
+        }
+
+        const zip = new JSZip();
+        const loadedZip = await zip.loadAsync(zipBuffer);
+
+        const protectedPatterns = [
+          'server_videos',
+          'server_pdfs',
+          'server_covers',
+          'hojja_catalog.json',
+          'hojja.sqlite',
+          'node_modules',
+          '.git',
+          'metadata.json'
+        ];
+
+        let updatedCount = 0;
+        const updatedFiles = [];
+
+        // GitHub archive root folder name is usually `${repoName}-${branch}/`
+        for (const [rawPath, zipEntry] of Object.entries(loadedZip.files)) {
+          if (zipEntry.dir) continue;
+
+          // Strip top-level directory (e.g. "h-jja-main/")
+          const parts = rawPath.replace(/^[\\\/]+/, '').split('/');
+          if (parts.length > 1) {
+            parts.shift(); // Remove top-level archive directory
+          }
+          const relPath = parts.join('/');
+          if (!relPath) continue;
+
+          const isProtected = protectedPatterns.some(p => relPath.startsWith(p) || relPath.includes('/' + p) || relPath === p);
+          if (isProtected) {
+            continue;
+          }
+
+          const targetFullPath = path.join(projectRoot, relPath);
+          const dir = path.dirname(targetFullPath);
+          if (!fs.existsSync(dir)) {
+            fs.mkdirSync(dir, { recursive: true });
+          }
+
+          const fileContent = await zipEntry.async('nodebuffer');
+          fs.writeFileSync(targetFullPath, fileContent);
+          updatedCount++;
+          if (updatedFiles.length < 50) {
+            updatedFiles.push(relPath);
+          }
+        }
+
+        console.log(`[Git Updater] Successfully applied ${updatedCount} files from GitHub!`);
+        sendJson(res, {
+          success: true,
+          method: 'direct-archive',
+          updatedCount,
+          updatedFilesSample: updatedFiles,
+          message: `تم جلب وتطبيق أحدث كود من GitHub بنجاح على ${updatedCount} ملف.`
+        });
+
+      } catch (pullErr) {
+        console.error('[Git Updater] Error during GitHub sync:', pullErr);
+        sendJson(res, { success: false, error: pullErr.message || 'فشل التحديث من GitHub' }, 500);
+      }
+    });
+    return true;
+  }
+
   // Path under /api/mobile but no handler matched
   sendJson(res, { error: 'Mobile endpoint not found' }, 404);
   return true;

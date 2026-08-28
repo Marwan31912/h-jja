@@ -305,7 +305,7 @@ function hojjaMobileBackendPlugin() {
     name: 'hojja-mobile-backend-middleware',
     configureServer(server) {
       server.middlewares.use(async (req, res, next) => {
-        if (req.url && (req.url.startsWith('/api/mobile') || req.url.startsWith('/api/educational'))) {
+        if (req.url && (req.url.startsWith('/api/mobile') || req.url.startsWith('/api/educational') || req.url.startsWith('/api/system'))) {
           try {
             const handled = await handleMobileRequest(req, res, {
               storageRoot: process.cwd(),

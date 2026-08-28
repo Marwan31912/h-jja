@@ -16,6 +16,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     checkUpdate: () => ipcRenderer.invoke('system:check-update'),
     applyHotPatch: (zipBuffer) => ipcRenderer.invoke('system:apply-hot-patch', zipBuffer),
     applyFilesUpdate: (files) => ipcRenderer.invoke('system:apply-files-update', files),
+    gitUpdate: (params) => ipcRenderer.invoke('system:git-update', params),
+    gitInfo: (repoUrl) => ipcRenderer.invoke('system:git-info', repoUrl),
     restartApp: () => ipcRenderer.invoke('system:restart-app')
   },
   educational: {
