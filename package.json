@@ -1,6 +1,6 @@
 {
   "name": "hojja-app",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "author": "Hojja Team",
   "main": "dist-electron/main.js",
   "description": "تطبيق حجة - المنصة التعليمية والأكاديمية الشاملة",
