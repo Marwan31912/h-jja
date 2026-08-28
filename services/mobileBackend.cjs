@@ -230,7 +230,7 @@ function transcodeSingleQuality(inputPath, outputPath, config) {
       }
 
       // Safe and robust scaling filter ensuring dimensions are divisible by 2 for H.264
-      const scaleFilter = `scale=-2:${config.height}:flags=lanczos,scale=trunc(iw/2)*2:trunc(ih/2)*2`;
+      const scaleFilter = `scale=-2:${config.height}`;
 
       let hasEnded = false;
       let timer = null;
@@ -239,13 +239,13 @@ function transcodeSingleQuality(inputPath, outputPath, config) {
         .output(tempOutputPath)
         .videoCodec('libx264')
         .audioCodec('aac')
-        .audioBitrate(config.audioBitrate || '128k')
+        .audioBitrate(config.audioBitrate || '96k')
         .outputOptions([
           '-y',
           '-nostdin',
           '-vf', scaleFilter,
           '-preset veryfast',
-          `-crf ${config.crf || 24}`,
+          `-crf ${config.crf || 25}`,
           '-movflags +faststart',
           '-pix_fmt yuv420p',
           '-threads 0'
@@ -316,7 +316,7 @@ function transcodeSingleQuality(inputPath, outputPath, config) {
 }
 
 /**
- * Background multi-quality video transcoder pipeline (720p, 480p, 360p)
+ * Background multi-quality video transcoder pipeline (720p, 480p, 360p, 320p)
  */
 async function processVideoMultiQuality(videoId, dataFile, videosDir, coversDir) {
   if (!ffmpegAvailable || !ffmpegInstance) {
@@ -379,17 +379,18 @@ async function processVideoMultiQuality(videoId, dataFile, videosDir, coversDir)
       }
       video.qualities['1080p'] = {
         quality: '1080p',
-        label: 'الأصلية / فائقة الوضوح (1080p)',
+        label: 'الأصلية / فائقة الوضوح (1080p FHD)',
         fileName: video.fileName,
         fileSize: originalSize,
         height: 1080
       };
 
-      // Quality Profiles
+      // Quality Profiles: 720p, 480p, 360p, 320p
       const profiles = [
         { quality: '720p', height: 720, crf: 23, audioBitrate: '128k', label: 'عالية (720p HD)' },
         { quality: '480p', height: 480, crf: 26, audioBitrate: '96k', label: 'متوسطة سريعة (480p SD)' },
-        { quality: '360p', height: 360, crf: 28, audioBitrate: '64k', label: 'اقتصادية للإنترنت الضعيف (360p)' }
+        { quality: '360p', height: 360, crf: 28, audioBitrate: '64k', label: 'اقتصادية موفرة (360p Eco)' },
+        { quality: '320p', height: 320, crf: 30, audioBitrate: '64k', label: 'منخفضة خفيفة (320p Light)' }
       ];
 
       for (let i = 0; i < profiles.length; i++) {
@@ -401,9 +402,9 @@ async function processVideoMultiQuality(videoId, dataFile, videosDir, coversDir)
         const result = await transcodeSingleQuality(inputVideoPath, outPath, {
           ...profile,
           onProgress: (p) => {
-            // Cap intermediate progress at 95% so it only hits 100% when truly done
+            // Cap intermediate progress before completion
             const rawProgress = ((i + (Math.min(99, p) / 100)) / profiles.length) * 100;
-            job.progress = Math.min(95, Math.max(5, Math.round(rawProgress)));
+            job.progress = Math.min(96, Math.max(5, Math.round(rawProgress)));
           }
         });
 
@@ -417,6 +418,8 @@ async function processVideoMultiQuality(videoId, dataFile, videosDir, coversDir)
           };
           job.qualitiesDone.push(profile.quality);
           job.qualities = video.qualities;
+        } else {
+          console.warn(`[FFmpeg Pipeline] Warning on quality ${profile.quality}:`, result.error);
         }
       }
 
@@ -424,6 +427,7 @@ async function processVideoMultiQuality(videoId, dataFile, videosDir, coversDir)
       video.transcodeProgress = 100;
       job.status = 'completed';
       job.progress = 100;
+      job.isProcessing = false;
       job.qualities = video.qualities;
 
       // Save final updated catalog
@@ -443,6 +447,7 @@ async function processVideoMultiQuality(videoId, dataFile, videosDir, coversDir)
     } catch (err) {
       console.error(`[FFmpeg Pipeline] Critical transcoding error for ${videoId}:`, err);
       job.status = 'failed';
+      job.isProcessing = false;
       job.error = err.message || 'خطأ أثناء المعالجة';
       video.transcodingStatus = 'failed';
       saveCatalogSafe(dataFile, catalog);
@@ -450,7 +455,7 @@ async function processVideoMultiQuality(videoId, dataFile, videosDir, coversDir)
       // Clear job after brief delay so client immediately gets completed status
       setTimeout(() => {
         activeTranscodeJobs.delete(videoId);
-      }, 2000);
+      }, 3500);
     }
   })();
 
@@ -1532,7 +1537,8 @@ async function handleMobileRequest(req, res, options = {}) {
       { key: '1080p', label: '1080p (عالية FHD)', defaultFile: video.fileName },
       { key: '720p', label: '720p (عالية HD)', defaultFile: null },
       { key: '480p', label: '480p (متوسطة SD)', defaultFile: null },
-      { key: '360p', label: '360p (اقتصادية)', defaultFile: null }
+      { key: '360p', label: '360p (اقتصادية)', defaultFile: null },
+      { key: '320p', label: '320p (منخفضة خفيفة)', defaultFile: null }
     ];
 
     definedQualities.forEach(qDef => {

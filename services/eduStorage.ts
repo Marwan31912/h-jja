@@ -114,15 +114,23 @@ export function resolveApiUrl(path: string): string {
 }
 
 /**
- * Returns playable video streaming URL (Supports HTTP 206 Range seeking)
+ * Returns playable video streaming URL (Supports HTTP 206 Range seeking and multi-qualities)
  */
-export function getVideoStreamUrl(fileNameOrId: string, video?: VideoLesson): string {
+export function getVideoStreamUrl(fileNameOrId: string, video?: VideoLesson, quality?: string): string {
   if (!fileNameOrId) return '';
-  if (video?.videoUrl && video.videoUrl.startsWith('http')) {
+  if (video?.videoUrl && video.videoUrl.startsWith('http') && !video.fileName) {
     return video.videoUrl;
   }
+
+  // 1. If explicit quality requested and exists in qualities map
+  if (quality && video?.qualities && video.qualities[quality]?.fileName) {
+    return resolveApiUrl(`/api/educational/file/video/${encodeURIComponent(video.qualities[quality].fileName)}`);
+  }
+
+  // 2. Default original file with optional quality fallback param
   const cleanName = video?.fileName || fileNameOrId;
-  return resolveApiUrl(`/api/educational/file/video/${encodeURIComponent(cleanName)}`);
+  const qParam = quality && quality !== 'auto' && quality !== '1080p' ? `?quality=${encodeURIComponent(quality)}` : '';
+  return resolveApiUrl(`/api/educational/file/video/${encodeURIComponent(cleanName)}${qParam}`);
 }
 
 /**

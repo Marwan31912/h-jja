@@ -4,7 +4,8 @@ import {
   Clock, User, FileVideo, HardDrive, Check, X, 
   Maximize2, Minimize2, RotateCcw, Volume2, VolumeX, Edit3,
   GripVertical, ChevronUp, ChevronDown, ArrowUpDown, Image as ImageIcon,
-  AlertCircle, RefreshCw, Layers, Sparkles, FolderPlus, Zap, Film
+  AlertCircle, RefreshCw, Layers, Sparkles, FolderPlus, Zap, Film,
+  MoreVertical, Sliders, Settings, Gauge
 } from 'lucide-react';
 import { VideoLesson } from '../../types';
 import { 
@@ -52,6 +53,9 @@ export const VideoSection: React.FC<VideoSectionProps> = ({
 }) => {
   const [activeVideo, setActiveVideo] = useState<VideoLesson | null>(null);
   const [activeVideoSrc, setActiveVideoSrc] = useState<string | null>(null);
+  const [activeQuality, setActiveQuality] = useState<string>('1080p');
+  const [showQualityMenu, setShowQualityMenu] = useState<boolean>(false);
+  const [playbackSpeed, setPlaybackSpeed] = useState<number>(1);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingVideo, setEditingVideo] = useState<VideoLesson | null>(null);
   
@@ -87,6 +91,23 @@ export const VideoSection: React.FC<VideoSectionProps> = ({
   const editCoverInputRef = useRef<HTMLInputElement>(null);
   const editVideoFileInputRef = useRef<HTMLInputElement>(null);
   const videoPlayerRef = useRef<HTMLVideoElement>(null);
+  const pendingSeekTimeRef = useRef<number | null>(null);
+  const qualityMenuRef = useRef<HTMLDivElement>(null);
+
+  // Close quality dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (qualityMenuRef.current && !qualityMenuRef.current.contains(e.target as Node)) {
+        setShowQualityMenu(false);
+      }
+    };
+    if (showQualityMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showQualityMenu]);
 
   // Live polling for FFmpeg transcoding status
   useEffect(() => {
@@ -97,11 +118,12 @@ export const VideoSection: React.FC<VideoSectionProps> = ({
       try {
         const res = await getVideoTranscodingStatus(editingVideo.id);
         if (res.success) {
-          if (res.isProcessing) {
+          if (res.isProcessing && res.progress < 100 && res.transcodingStatus !== 'completed') {
             setEditTranscodeStatus('processing');
             setEditTranscodeProgress(res.progress || 0);
           } else {
-            setEditTranscodeStatus(res.transcodingStatus || 'completed');
+            // Finished or completed: immediately finalize progress bar
+            setEditTranscodeStatus(res.transcodingStatus === 'failed' ? 'failed' : 'completed');
             setEditTranscodeProgress(100);
             if (res.qualities) {
               setEditQualities(res.qualities);
@@ -115,8 +137,8 @@ export const VideoSection: React.FC<VideoSectionProps> = ({
                 return {
                   ...v,
                   qualities: res.qualities || v.qualities,
-                  transcodingStatus: res.isProcessing ? 'processing' : (res.transcodingStatus || v.transcodingStatus || 'completed'),
-                  transcodeProgress: res.isProcessing ? res.progress : 100
+                  transcodingStatus: res.isProcessing && res.progress < 100 ? 'processing' : (res.transcodingStatus || v.transcodingStatus || 'completed'),
+                  transcodeProgress: res.isProcessing && res.progress < 100 ? res.progress : 100
                 };
               }
               return v;
@@ -145,12 +167,18 @@ export const VideoSection: React.FC<VideoSectionProps> = ({
     async function loadSrc() {
       if (!activeVideo) {
         setActiveVideoSrc(null);
+        setActiveQuality('1080p');
         return;
       }
 
+      // Default quality preference: 1080p if exists, else first available quality
+      const avail = activeVideo.qualities ? Object.keys(activeVideo.qualities) : [];
+      const defaultQ = avail.includes('1080p') ? '1080p' : (avail[0] || '1080p');
+      setActiveQuality(defaultQ);
+
       // 1. If it has a fileName or is a local file, stream directly from server
       if (activeVideo.fileName) {
-        const streamUrl = getVideoStreamUrl(activeVideo.fileName, activeVideo);
+        const streamUrl = getVideoStreamUrl(activeVideo.fileName, activeVideo, defaultQ);
         setActiveVideoSrc(streamUrl);
         return;
       }
@@ -173,6 +201,51 @@ export const VideoSection: React.FC<VideoSectionProps> = ({
       }
     };
   }, [activeVideo]);
+
+  // Switch video quality seamlessly without losing current playback position
+  const handleQualityChange = (newQuality: string) => {
+    if (!activeVideo || !activeVideo.fileName) return;
+
+    if (videoPlayerRef.current) {
+      pendingSeekTimeRef.current = videoPlayerRef.current.currentTime;
+    }
+
+    setActiveQuality(newQuality);
+    const newStreamUrl = getVideoStreamUrl(activeVideo.fileName, activeVideo, newQuality);
+    setActiveVideoSrc(newStreamUrl);
+    setShowQualityMenu(false);
+
+    const qualityNames: Record<string, string> = {
+      '1080p': '1080p FHD (الأصلية)',
+      '720p': '720p HD (عالية الدقة)',
+      '480p': '480p SD (متوسطة)',
+      '360p': '360p Eco (اقتصادية)',
+      '320p': '320p Light (منخفضة خفيفة)'
+    };
+    onShowToast(`تم التبديل إلى جودة: ${qualityNames[newQuality] || newQuality}`);
+  };
+
+  // Change playback speed
+  const handleSpeedChange = (speed: number) => {
+    setPlaybackSpeed(speed);
+    if (videoPlayerRef.current) {
+      videoPlayerRef.current.playbackRate = speed;
+    }
+    setShowQualityMenu(false);
+    onShowToast(`سرعة التشغيل: ${speed}x`);
+  };
+
+  // When video metadata is loaded, restore playback position & rate
+  const handleVideoLoadedMetadata = () => {
+    if (videoPlayerRef.current) {
+      if (pendingSeekTimeRef.current !== null && pendingSeekTimeRef.current > 0) {
+        videoPlayerRef.current.currentTime = pendingSeekTimeRef.current;
+        pendingSeekTimeRef.current = null;
+      }
+      videoPlayerRef.current.playbackRate = playbackSpeed;
+      videoPlayerRef.current.play().catch(() => {});
+    }
+  };
 
   // Format file size
   const formatSize = (bytes?: number) => {
@@ -627,7 +700,14 @@ export const VideoSection: React.FC<VideoSectionProps> = ({
                 <Play size={20} />
               </div>
               <div>
-                <h4 className="text-base font-black">{activeVideo.title}</h4>
+                <h4 className="text-base font-black flex items-center gap-2">
+                  <span>{activeVideo.title}</span>
+                  {activeQuality && (
+                    <span className="px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-500 border border-blue-500/20 text-[10px] font-black">
+                      {activeQuality.toUpperCase()}
+                    </span>
+                  )}
+                </h4>
                 <div className="flex items-center gap-3 text-xs text-gray-400 font-bold mt-0.5">
                   <span className="flex items-center gap-1"><User size={12} /> {activeVideo.author || 'المحاضر'}</span>
                   {activeVideo.fileSize && (
@@ -639,7 +719,108 @@ export const VideoSection: React.FC<VideoSectionProps> = ({
                 </div>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            
+            <div className="flex items-center gap-2 relative">
+              {/* 3-Dots Quality & Settings Button in Header */}
+              <div className="relative" ref={qualityMenuRef}>
+                <button
+                  type="button"
+                  onClick={() => setShowQualityMenu(!showQualityMenu)}
+                  className={`p-2 rounded-xl border text-xs font-black flex items-center gap-1.5 transition-all ${
+                    showQualityMenu 
+                      ? 'bg-blue-600 text-white border-blue-600 shadow-md' 
+                      : isDarkMode ? 'bg-zinc-800 border-white/10 text-gray-200 hover:bg-zinc-700' : 'bg-gray-100 border-gray-200 text-gray-700 hover:bg-gray-200'
+                  }`}
+                  title="خيارات وجودات الفيديو (3 نقاط)"
+                >
+                  <MoreVertical size={16} />
+                  <span className="hidden sm:inline">الجودة ({activeQuality})</span>
+                </button>
+
+                {/* Dropdown Quality & Options Popover */}
+                {showQualityMenu && (
+                  <div className={`absolute left-0 sm:left-auto sm:right-0 top-full mt-2 w-72 rounded-2xl shadow-2xl border p-4 z-50 animate-in fade-in zoom-in-95 duration-150 ${
+                    isDarkMode ? 'bg-zinc-900/95 border-white/10 text-white backdrop-blur-xl' : 'bg-white/95 border-gray-200 text-gray-800 backdrop-blur-xl'
+                  }`} dir="rtl">
+                    <div className="flex items-center justify-between pb-2.5 mb-2.5 border-b border-gray-100 dark:border-white/10">
+                      <div className="flex items-center gap-2">
+                        <Sliders size={15} className="text-blue-500" />
+                        <span className="text-xs font-black">اختيار جودة البث</span>
+                      </div>
+                      <span className="text-[10px] px-2 py-0.5 rounded-md bg-blue-500/10 text-blue-500 font-black">
+                        {activeQuality}
+                      </span>
+                    </div>
+
+                    {/* Qualities List */}
+                    <div className="space-y-1 mb-3">
+                      {[
+                        { key: '1080p', label: '1080p FHD (الأصلية / فائقة الوضوح)', badge: 'FHD' },
+                        { key: '720p', label: '720p HD (عالية الدقة)', badge: 'HD' },
+                        { key: '480p', label: '480p SD (متوسطة سريعة)', badge: 'SD' },
+                        { key: '360p', label: '360p Eco (اقتصادية)', badge: '360p' },
+                        { key: '320p', label: '320p Light (منخفضة خفيفة)', badge: '320p' },
+                      ].map((q) => {
+                        const isAvailable = activeVideo?.qualities ? (Boolean(activeVideo.qualities[q.key]) || q.key === '1080p') : true;
+                        const isCurrent = activeQuality === q.key;
+                        const qInfo = activeVideo?.qualities?.[q.key];
+
+                        return (
+                          <button
+                            key={q.key}
+                            type="button"
+                            onClick={() => handleQualityChange(q.key)}
+                            className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all ${
+                              isCurrent
+                                ? 'bg-blue-600 text-white shadow-md'
+                                : isAvailable
+                                ? isDarkMode ? 'hover:bg-zinc-800 text-zinc-200' : 'hover:bg-gray-100 text-gray-700'
+                                : isDarkMode ? 'opacity-40 hover:bg-zinc-800/40 text-gray-500' : 'opacity-40 hover:bg-gray-50 text-gray-400'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2">
+                              {isCurrent ? (
+                                <Check size={14} className="text-white" />
+                              ) : (
+                                <div className="w-3.5 h-3.5 rounded-full border border-gray-400/40" />
+                              )}
+                              <span>{q.label}</span>
+                            </div>
+                            <div className="text-[10px] opacity-80 font-mono">
+                              {qInfo?.fileSize ? formatSize(qInfo.fileSize) : ''}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Playback Speed Section */}
+                    <div className="pt-2.5 border-t border-gray-100 dark:border-white/10 space-y-1.5">
+                      <div className="flex items-center gap-1.5 text-[11px] font-black text-gray-400">
+                        <Gauge size={13} className="text-emerald-500" />
+                        <span>سرعة تشغيل الفيديو:</span>
+                      </div>
+                      <div className="grid grid-cols-5 gap-1">
+                        {[0.75, 1, 1.25, 1.5, 2].map((s) => (
+                          <button
+                            key={s}
+                            type="button"
+                            onClick={() => handleSpeedChange(s)}
+                            className={`py-1 rounded-lg text-[10px] font-black text-center transition-all ${
+                              playbackSpeed === s
+                                ? 'bg-emerald-600 text-white'
+                                : isDarkMode ? 'bg-zinc-800 text-gray-300 hover:bg-zinc-700' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            }`}
+                          >
+                            {s}x
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <button 
                 type="button"
                 onClick={(e) => handleOpenEdit(activeVideo, e)}
@@ -647,7 +828,7 @@ export const VideoSection: React.FC<VideoSectionProps> = ({
                 title="تعديل بيانات وغلاف وإرفاق ملف الفيديو"
               >
                 <Edit3 size={14} />
-                <span>تعديل وإرفاق الفيديو</span>
+                <span className="hidden sm:inline">تعديل وإرفاق الفيديو</span>
               </button>
               <button 
                 onClick={() => setActiveVideo(null)}
@@ -659,15 +840,31 @@ export const VideoSection: React.FC<VideoSectionProps> = ({
           </div>
 
           {/* HTML5 Native Video Player */}
-          <div className="relative aspect-video w-full rounded-2xl bg-black overflow-hidden shadow-inner flex items-center justify-center">
+          <div className="relative aspect-video w-full rounded-2xl bg-black overflow-hidden shadow-inner flex items-center justify-center group">
             {activeVideoSrc ? (
-              <video 
-                ref={videoPlayerRef}
-                src={activeVideoSrc} 
-                controls 
-                autoPlay 
-                className="w-full h-full object-contain"
-              />
+              <>
+                <video 
+                  ref={videoPlayerRef}
+                  src={activeVideoSrc} 
+                  controls 
+                  autoPlay 
+                  onLoadedMetadata={handleVideoLoadedMetadata}
+                  className="w-full h-full object-contain"
+                />
+
+                {/* Floating Quick 3-Dots Quality Trigger on the Video */}
+                <div className="absolute top-4 left-4 z-20 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                  <button
+                    type="button"
+                    onClick={() => setShowQualityMenu(!showQualityMenu)}
+                    className="px-3 py-1.5 rounded-xl bg-black/60 hover:bg-black/80 backdrop-blur-md border border-white/20 text-white text-xs font-black flex items-center gap-1.5 shadow-lg transition-all"
+                    title="خيارات الجودة والسرعة (⋮)"
+                  >
+                    <MoreVertical size={14} />
+                    <span>الجودة: {activeQuality}</span>
+                  </button>
+                </div>
+              </>
             ) : (
               <div className="text-white text-center p-6 space-y-3">
                 <FileVideo size={40} className="mx-auto text-emerald-400 opacity-80" />
@@ -1322,12 +1519,13 @@ export const VideoSection: React.FC<VideoSectionProps> = ({
                 )}
 
                 {/* Available Qualities Grid */}
-                <div className="grid grid-cols-4 gap-1.5 text-center">
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5 text-center">
                   {[
                     { key: '1080p', label: '1080p FHD', sub: 'الأصلية' },
                     { key: '720p', label: '720p HD', sub: 'عالية' },
                     { key: '480p', label: '480p SD', sub: 'متوسطة' },
-                    { key: '360p', label: '360p Eco', sub: 'سريعة' },
+                    { key: '360p', label: '360p Eco', sub: 'اقتصادية' },
+                    { key: '320p', label: '320p Light', sub: 'خفيفة' },
                   ].map((q) => {
                     const isAvail = editQualities[q.key] || q.key === '1080p';
                     const qData = editQualities[q.key];
